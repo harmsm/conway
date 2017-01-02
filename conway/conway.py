@@ -10,6 +10,10 @@ import numpy as np
 np.set_printoptions(threshold=np.nan)
 import scipy.signal
 
+import matplotlib
+from matplotlib import cm
+from matplotlib import pyplot as plt
+
 class Conway:
     """
     Class for playing Conway's Game of Life.
@@ -35,7 +39,7 @@ class Conway:
         if self._state_file:
             self._read_state_file(state_file)           
         else: 
-            self._current_state = np.zeros((self._x_size,self._y_size),dtype=np.bool)
+            self._initial_state = np.zeros((self._y_size,self._x_size),dtype=np.bool)
             if not self._seed:
                 self._seed = np.random.randint(0,high=2**32)
             self._random_state(self._starting_density)
@@ -48,8 +52,13 @@ class Conway:
         self._donut_kernel[1,1] = 0
 
         # Initial state of the system
-        self._initial_state = np.copy(self._current_state)
+        self.reset()
 
+    def reset(self):
+
+        # Reset the iterator
+        self._current_state = np.copy(self._initial_state)
+        
         # Record number of time steps that each cell is alive over sim
         self._time_alive = np.zeros(self._current_state.shape,dtype=np.int)
         self._time_alive += self._current_state
@@ -60,6 +69,7 @@ class Conway:
         # alive, the counter resets to 0 for that cell. 
         self._time_since_alive = np.ones(self._current_state.shape,dtype=np.int)*-1
         self._time_since_alive += self._current_state
+
 
     def _read_state_file(self,state_file):
         """
@@ -86,10 +96,10 @@ class Conway:
         lines = [l for l in lines if not l.startswith("#") and
                  len(l.strip()) != 0]
 
-        # Construct current state matrix
+        # Construct initial state matrix
         self._x_size = len(list(lines[0].strip()))
         self._y_size = len(lines) 
-        self._current_state = np.zeros((self._y_size,self._x_size),dtype=np.bool)
+        self._initial_state = np.zeros((self._y_size,self._x_size),dtype=np.bool)
     
         # Read the file.
         for i, l in enumerate(lines):
@@ -102,7 +112,7 @@ class Conway:
                 err = "Row {:} does not have {:} columns.\n".format(i,self._x_size)
                 raise ValueError(err)
 
-            self._current_state[i,:] = row
+            self._initial_state[i,:] = row
 
     def write_state_file(self,out_file,initial_state=True):
         """
@@ -149,7 +159,7 @@ class Conway:
         np.random.seed(self.seed)
    
         self._starting_density = starting_density
-        self._current_state = np.random.rand(self._y_size,self._x_size) > self._starting_density
+        self._initial_state = np.random.rand(self._y_size,self._x_size) < self._starting_density
 
 
     def iterate(self):
@@ -180,71 +190,6 @@ class Conway:
         # Increment the time_since_alive for those cells by one.
         time_mask = (self._time_since_alive != -1)*(self._current_state == 0)
         self._time_since_alive[time_mask] += 1
-
-    def iterate_slowly(self):
-        """
-        Calculate the next iteration of the game.
-        """
-
-        self._next_state = np.zeros((self._y_size,self._x_size),dtype=bool)
-        for i in range(self._y_size):
-            for j in range(self._x_size):
-                num_neighbors = self._neighbor_density(i,j)
-    
-                # living cell
-                if self._current_state[i,j] == 1:
-
-                    # die of crowding or loneliness
-                    if num_neighbors < 2 or num_neighbors > 3:
-                        self._next_state[i,j] = 0
-            
-                    # happily remain
-                    else:
-                        self._next_state[i,j] = 1
-
-                # dead cell
-                else:
-                    # spawn
-                    if num_neighbors == 3:
-                        self._next_state[i,j] = 1
-
-                    # stay dead
-                    else:
-                        self._next_state[i,j] = 0
-        
-      
-        self._current_state = np.copy(self._next_state)
-
- 
-    def _neighbor_density(self,i,j):
-        """
-        Calculate the number of neighbors for a given grid point defined by i
-        and j. 
-        """
-
-        # determine neighbor i indexes
-        l1 = [i-1,i,i+1]
-        if i + 1 == self._y_size:
-            l1[2] = 0 
-        elif i + 1 > self._y_size:
-            err = "Bound error."
-            raise ValueError(err)
-        else:
-            pass
-       
-        # detremine neighbor j indexes 
-        l2 = [j-1,j,j+1]
-        if j + 1 == self._x_size:
-            l2[2] = 0 
-        elif j + 1 > self._x_size:
-            err = "Bound error."
-            raise ValueError(err)
-        else:
-            pass
-
-        sub = self._current_state[[[l1[0]],[l1[1]],[l1[2]]],l2]
-
-        return np.sum(sub) - sub[1,1]
 
     @property
     def seed(self):
@@ -297,3 +242,31 @@ class Conway:
         """
 
         return self._time_since_alive
+
+    def as_rgba(self,cmap=cm.copper,history_length=100,flip=False):
+        """
+        Return the current Conway state as RGBA, using the cmap specified. The
+        cmap should be an instance of 
+        """
+        
+        # Put each pixel on a 0-1 scale capturing its state ranging from 
+        # alive to previously alive to dead
+        to_plot = np.zeros(self.current_state.shape,dtype=np.float)
+        to_plot[self.current_state] = 1.0
+        step = 1.0/(history_length + 2)
+        for i in range(history_length):
+            to_plot[self.time_since_alive == i] = 1 - (i + 1)*step
+        
+        # Flip color scale if requested
+        if flip:
+            to_plot = 1 - to_plot
+
+        # Put on 0-254 scale
+        to_plot = to_plot*254
+
+        plt.imshow(to_plot,cmap=cmap,interpolation="nearest")
+        plt.show()
+        
+        # Return RGBA color map
+        return cmap(to_plot)
+        
