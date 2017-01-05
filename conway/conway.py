@@ -264,9 +264,6 @@ class Conway:
         # Put on 0-254 scale
         to_plot = to_plot*254
 
-        plt.imshow(to_plot,cmap=cmap,interpolation="nearest")
-        plt.show()
-        
         # Return RGBA color map
         return cmap(to_plot)
         
