@@ -41,7 +41,7 @@ class Conway:
         else: 
             self._initial_state = np.zeros((self._y_size,self._x_size),dtype=np.bool)
             if not self._seed:
-                self._seed = np.random.randint(0,high=2**32)
+                self._seed = np.random.randint(0,high=2**31)
             self._random_state(self._starting_density)
 
         # Create kernel for convolution/neighbor counting
@@ -262,8 +262,8 @@ class Conway:
             to_plot = 1 - to_plot
 
         # Put on 0-254 scale
-        to_plot = to_plot*254
+        to_plot = to_plot
 
         # Return RGBA color map
-        return cmap(to_plot)
+        return cmap(to_plot)*254
         
